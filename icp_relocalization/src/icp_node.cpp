@@ -5,7 +5,9 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/common/transforms.h>
 #include <pcl/registration/icp.h>
+#include <pcl/filters/crop_box.h>
 #include <pcl/filters/voxel_grid.h>
 #include <Eigen/Geometry>
 #include <tf2/LinearMath/Quaternion.h>
@@ -35,6 +37,8 @@ public:
         this->declare_parameter("fitness_score_thre", 0.0);
         this->declare_parameter("map_voxel_leaf_size", 0.1);
         this->declare_parameter("cloud_voxel_leaf_size", 0.1);
+        this->declare_parameter("local_map_cube_side_length", 0.0);
+        this->declare_parameter("local_map_min_points", 50);
         this->declare_parameter("converged_count_thre", 20);
         this->declare_parameter("pcl_type","livox");
 
@@ -50,6 +54,8 @@ public:
         this->get_parameter("fitness_score_thre", fitness_score_thre);
         this->get_parameter("map_voxel_leaf_size", map_voxel_leaf_size);
         this->get_parameter("cloud_voxel_leaf_size", cloud_voxel_leaf_size);
+        this->get_parameter("local_map_cube_side_length", local_map_cube_side_length);
+        this->get_parameter("local_map_min_points", local_map_min_points);
         this->get_parameter("converged_count_thre", converged_count_thre);
         this->get_parameter("pcl_type", pcl_type);
 
@@ -113,6 +119,55 @@ public:
     }
 
 private:
+    bool prepare_input_cloud_for_icp(pcl::PointCloud<pcl::PointXYZ>::Ptr &input_cloud)
+    {
+        if (local_map_cube_side_length <= 0.0)
+        {
+            return true;
+        }
+
+        const std::size_t original_size = input_cloud->size();
+        const float half_side = static_cast<float>(local_map_cube_side_length * 0.5);
+        const float center_x = initGuess(0, 3);
+        const float center_y = initGuess(1, 3);
+        const float center_z = initGuess(2, 3);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr input_cloud_in_map(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::transformPointCloud(*input_cloud, *input_cloud_in_map, initGuess);
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr filtered_cloud_in_map(new pcl::PointCloud<pcl::PointXYZ>);
+        pcl::CropBox<pcl::PointXYZ> crop;
+        crop.setInputCloud(input_cloud_in_map);
+        crop.setMin(Eigen::Vector4f(center_x - half_side, center_y - half_side, center_z - half_side, 1.0f));
+        crop.setMax(Eigen::Vector4f(center_x + half_side, center_y + half_side, center_z + half_side, 1.0f));
+        crop.filter(*filtered_cloud_in_map);
+
+        if (filtered_cloud_in_map->empty())
+        {
+            RCLCPP_WARN(this->get_logger(), "Local ICP input cloud is empty after cube crop; skipping this scan");
+            converged_count = 0;
+            return false;
+        }
+
+        if (static_cast<int>(filtered_cloud_in_map->size()) < local_map_min_points)
+        {
+            RCLCPP_WARN(
+                this->get_logger(),
+                "Local ICP input cloud has only %zu points after cube crop, below local_map_min_points=%d; skipping this scan",
+                filtered_cloud_in_map->size(), local_map_min_points);
+            converged_count = 0;
+            return false;
+        }
+
+        pcl::transformPointCloud(*filtered_cloud_in_map, *input_cloud, initGuess.inverse());
+        RCLCPP_INFO(
+            this->get_logger(),
+            "Using local ICP input cloud: %zu/%zu points inside %.3f m cube centered at [%.3f, %.3f, %.3f]",
+            input_cloud->size(), original_size, local_map_cube_side_length, initGuess(0, 3), initGuess(1, 3), initGuess(2, 3));
+
+        return true;
+    }
+
     void cloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         // Convert the incoming point cloud to PCL format
@@ -131,6 +186,11 @@ private:
         // rotation(1, 1) = -1;
         // rotation(2, 2) = -1;
         // pcl::transformPointCloud(*input_cloud, *input_cloud, rotation);
+
+        if (!prepare_input_cloud_for_icp(input_cloud))
+        {
+            return;
+        }
 
         // Perform ICP alignment
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
@@ -225,10 +285,15 @@ private:
         RCLCPP_INFO(this->get_logger(), "Downsampled input cloud to %d data points", input_cloud->width * input_cloud->height);
 
         // Rotate pcl alone x axis for 180 degree
-        // Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();
-        // rotation(1, 1) = -1;
-        // rotation(2, 2) = -1;
-        // pcl::transformPointCloud(*input_cloud, *input_cloud, rotation);
+        Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();
+        rotation(1, 1) = -1;
+        rotation(2, 2) = -1;
+        pcl::transformPointCloud(*input_cloud, *input_cloud, rotation);
+
+        if (!prepare_input_cloud_for_icp(input_cloud))
+        {
+            return;
+        }
 
         // Perform ICP alignment
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
@@ -348,10 +413,10 @@ private:
     double max_correspondence_distance, RANSAC_outlier_rejection_threshold;
     std::string map_path, map_frame;
     double fitness_score_thre;
-    double map_voxel_leaf_size, cloud_voxel_leaf_size;
+    double map_voxel_leaf_size, cloud_voxel_leaf_size, local_map_cube_side_length;
     sensor_msgs::msg::PointCloud2 target_cloud_msg;
     int converged_count = 0;
-    int converged_count_thre;
+    int converged_count_thre, local_map_min_points;
     std::string pcl_type;
 };
 

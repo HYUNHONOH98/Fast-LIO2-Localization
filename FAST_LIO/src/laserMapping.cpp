@@ -418,13 +418,16 @@ public:
         string pos_log_dir = root_dir + "/Log/pos_log.txt";
         fp = fopen(pos_log_dir.c_str(), "w");
 
-        fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"), ios::out);
-        fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), ios::out);
-        fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"), ios::out);
-        if (fout_pre && fout_out)
-            cout << "~~~~" << ROOT_DIR << " file opened" << endl;
-        else
-            cout << "~~~~" << ROOT_DIR << " doesn't exist" << endl;
+        if (runtime_pos_log)
+        {
+            fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"), ios::out);
+            fout_out.open(DEBUG_FILE_DIR("mat_out.txt"), ios::out);
+            fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"), ios::out);
+            if (fout_pre && fout_out)
+                cout << "~~~~" << ROOT_DIR << " file opened" << endl;
+            else
+                cout << "~~~~" << ROOT_DIR << " doesn't exist" << endl;
+        }
 
         /*** ROS subscribe initialization ***/
         if (p_pre->lidar_type == AVIA)
@@ -1160,8 +1163,11 @@ private:
             feats_down_world->resize(feats_down_size);
 
             V3D ext_euler = SO3ToEuler(state_point.offset_R_L_I);
-            fout_pre << setw(20) << Measures.lidar_beg_time - first_lidar_time << " " << euler_cur.transpose() << " " << state_point.pos.transpose() << " " << ext_euler.transpose() << " " << state_point.offset_T_L_I.transpose() << " " << state_point.vel.transpose()
-                     << " " << state_point.bg.transpose() << " " << state_point.ba.transpose() << " " << state_point.grav << endl;
+            if (runtime_pos_log)
+            {
+                fout_pre << setw(20) << Measures.lidar_beg_time - first_lidar_time << " " << euler_cur.transpose() << " " << state_point.pos.transpose() << " " << ext_euler.transpose() << " " << state_point.offset_T_L_I.transpose() << " " << state_point.vel.transpose()
+                         << " " << state_point.bg.transpose() << " " << state_point.ba.transpose() << " " << state_point.grav << endl;
+            }
 
             if (ikd_tree_pub_en) // If you need to see map point, change to "if(1)"
             {
@@ -1293,9 +1299,12 @@ int main(int argc, char **argv)
         cout << "current scan saved to /PCD/" << file_name << endl;
         pcd_writer.writeBinary(all_points_dir, *pcl_wait_pub);
     }
-    fout_out.close();
-    fout_pre.close();
-    fout_dbg.close();
+    if (fout_out.is_open())
+        fout_out.close();
+    if (fout_pre.is_open())
+        fout_pre.close();
+    if (fout_dbg.is_open())
+        fout_dbg.close();
     fclose(fp);
 
     if (runtime_pos_log)

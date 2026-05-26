@@ -1,7 +1,8 @@
 /**:
     ros__parameters:
         locate_in_prior_map: true
-        prior_map_path: "/home/sentry_ws/src/FAST_LIO_SAM/PCD/GlobalMap.pcd"
+        prior_map_path: "/workspace/holosoma/src/holosoma/holosoma/data/robots/g1/scenes/2026_5_22.pcd"
+        # prior_map_path: "/workspace/holosoma/src/holosoma/holosoma/data/robots/g1/scenes/scene_icp_room_12m.pcd"
         feature_extract_enable: false
         point_filter_num: 3
         max_iteration: 3
@@ -13,11 +14,11 @@
 
         common:
             odom_frame_id: "odom"
-            sensor_frame_id: "imu_link"
-            base_frame_id: "base_link"
+            sensor_frame_id: "mid360_link"
+            base_frame_id: "pelvis"
             send_odom_base_tf: true
             lid_topic:  "/livox/lidar"
-            imu_topic:  "/imu/data"
+            imu_topic:  "/livox/imu"
             time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
             time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
                                         # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0
@@ -27,7 +28,7 @@
             scan_line:  4
             blind: 0.5
             timestamp_unit: 3
-            scan_rate: 10
+            scan_rate: 50
 
         mapping:
             acc_cov: 0.1
@@ -36,7 +37,7 @@
             b_gyr_cov: 0.0001
             fov_degree:    360.0
             det_range:     100.0
-            extrinsic_est_en:  true      # true: enable the online estimation of IMU-LiDAR extrinsic
+            extrinsic_est_en:  false     # sim uses the known fixed IMU-LiDAR extrinsic
             extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
             extrinsic_R: [ 1., 0., 0.,
                             0., -1., 0.,
@@ -46,9 +47,9 @@
             path_en: false                # true: publish Path
             effect_map_en: false         # true: publish Effects
             map_en: false                 # true: publish Map cloud
-            scan_publish_en:  true       # false: close all the point cloud output
-            dense_publish_en: true      # false: low down the points number in a global-frame point clouds scan.
-            scan_bodyframe_pub_en: true  # true: output the point cloud scans in IMU-body-frame
+            scan_publish_en:  false      # false: close all the point cloud output
+            dense_publish_en: false      # false: low down the points number in a global-frame point clouds scan.
+            scan_bodyframe_pub_en: false # true: output the point cloud scans in IMU-body-frame
 
         pcd_save:
             pcd_save_en: false

@@ -33,6 +33,8 @@ def generate_launch_description():
 
           {'map_voxel_leaf_size':0.5},
           {'cloud_voxel_leaf_size':0.3},
+          {'local_map_cube_side_length':0.0}, # <= 0 disables local ICP input cloud crop; set > 0 in meters
+          {'local_map_min_points':50},
           {'map_frame_id':'map'},
           {'solver_max_iter':100},
           {'max_correspondence_distance':0.1},
