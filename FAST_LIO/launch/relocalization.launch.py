@@ -49,7 +49,7 @@ def generate_launch_description():
           {'map_path':'/workspace/holosoma/src/holosoma/holosoma/data/robots/g1/scenes/2026_5_22.pcd'},
           # {'map_path':'/workspace/holosoma/src/holosoma/holosoma/data/robots/g1/scenes/scene_icp_room_12m.pcd'}, # for local map crop test
           {'fitness_score_thre':0.1}, # 是最近点距离的平均值，越小越严格
-          {'converged_count_thre': 100}, # pcl pub at 50 hz, 2s
+          {'converged_count_thre': 20}, # pcl pub at 10 hz, 2s
           {'pcl_type':'livox'},
       ],
   )
